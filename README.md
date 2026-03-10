@@ -7,6 +7,13 @@ Built with **FastAPI**, **React (Vite)**, **PostgreSQL**, and a **local LLM-base
 
 ---
 
+## run
+```
+back : uvicorn main:app --reload
+
+fron : npm run dev
+
+```
 ## Overview
 
 Real-time chat translation introduces unique challenges that go beyond standard web applications:
@@ -129,6 +136,7 @@ npm install
 ```
 npm run dev
 ```
+
 
 
 ### 🐳 Docker Setup (Recommended)
