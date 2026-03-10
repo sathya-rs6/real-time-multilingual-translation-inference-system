@@ -7,8 +7,6 @@ from models.message_translation import MessageTranslation
 from schemas.translation import TranslateRequest, TranslateResponse
 from services.translation_service import translate_if_needed
 
-
-
 router = APIRouter(prefix="/translations", tags=["Translations"])
 
 
