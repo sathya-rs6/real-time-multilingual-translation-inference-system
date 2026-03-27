@@ -15,24 +15,29 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    const res = await fetch("http://127.0.0.1:8000/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const res = await fetch("http://127.0.0.1:8000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (!res.ok) {
-      setError("Invalid email or password");
-      return;
+      if (!res.ok) {
+        setError("Invalid email or password");
+        return;
+      }
+
+      const data = await res.json();
+      state.token = data.access_token;
+      state.userId = email;
+
+      navigate("/home");
+    } catch (err) {
+      setLoading(false);
+      setError("Network or server error. Please try again.");
     }
-
-    const data = await res.json();
-    state.token = data.access_token;
-    state.userId = email;
-
-    navigate("/home");
   }
 
   /* ===== Floating background animation ===== */

@@ -24,7 +24,7 @@ def get_db():
         db.close()
 
 
-@router.get("/")
+@router.get("")
 def list_rooms(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -39,7 +39,7 @@ def list_rooms(
     return [{"id": r.id, "name": r.name} for r in rooms]
 
 
-@router.post("/")
+@router.post("")
 def create_room(
     data: RoomCreate,
     db: Session = Depends(get_db),

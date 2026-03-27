@@ -3,7 +3,7 @@
 A production-oriented **real-time multilingual message translation system** designed for low-latency inference in chat applications.  
 The system enables users to communicate across languages seamlessly using **WebSockets** and **ML-powered translation inference**.
 
-Built with **FastAPI**, **React (Vite)**, **PostgreSQL**, and a **local LLM-based translation pipeline**.
+Built with **FastAPI**, **React (Vite)**, **PostgreSQL**, and a **Gemini API-powered translation pipeline**.
 
 ---
 
@@ -49,7 +49,7 @@ This project addresses these challenges by combining:
 - **Frontend**: React (Vite) — real-time UI using WebSockets  
 - **Backend**: FastAPI — API, authentication, and message orchestration  
 - **Database**: PostgreSQL — persistent storage for users, rooms, messages, and translations  
-- **ML Inference**: Local LLM-based translation (Meta NLLB-200-600M implementation)  
+- **ML Inference**: Cloud LLM-based translation (Google Gemini 2.5 API integration)  
 - **Communication**: REST APIs + WebSockets  
 
 ---
@@ -114,6 +114,7 @@ Set environment variables
 Create a .env file in backend/:
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/chatdb
 SECRET_KEY=super-secret-key
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 

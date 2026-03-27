@@ -26,17 +26,22 @@ class ConnectionManager:
         sender_name: str,
         original_text: str,
         source_lang: str,
-        message_id: str,          # ✅ REQUIRED
-        translate_fn,              # translate_if_needed
+        message_id: str,
+        translate_fn,  # async translate_if_needed
     ):
-        for conn in self.rooms.get(room_id, []):
-            target_lang = conn["lang"]
+        connections = self.rooms.get(room_id, [])
+        if not connections:
+            return
 
-            # ✅ CRITICAL FIX: skip translation if same language
+        async def process_translation_and_send(conn):
+            target_lang = conn["lang"]
+            
+            # If languages match, no translation needed
             if target_lang == source_lang:
                 text = original_text
             else:
-                text = translate_fn(
+                # Call async translation function
+                text = await translate_fn(
                     message_id=message_id,
                     original_text=original_text,
                     source_lang=source_lang,
@@ -51,6 +56,10 @@ class ConnectionManager:
                 "room_id": room_id,
                 "language": target_lang,
             })
+
+        # Run all translations and sends in parallel
+        import asyncio
+        await asyncio.gather(*(process_translation_and_send(c) for c in connections))
 
 
 manager = ConnectionManager()

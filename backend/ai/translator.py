@@ -1,55 +1,52 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
+import os
+from dotenv import load_dotenv
+from google import genai
 
-MODEL_NAME = "facebook/nllb-200-distilled-600M"
+# Load environment variables from .env
+load_dotenv()
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+import logging
 
-print(f"🔍 Loading {MODEL_NAME} on {device}")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForSeq2SeqLM.from_pretrained(
-    MODEL_NAME,
-    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-).to(device)
+# Initialize the Gemini API client using GEMINI_API_KEY from .env
+api_key = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=api_key)
 
-model.eval()
-
-# ✅ Frontend → NLLB language mapping
-LANG_MAP = {
-    "en": "eng_Latn",
-    "hi": "hin_Deva",
-    "ta": "tam_Taml",
-    "ml": "mal_Mlym",
-    "te": "tel_Telu",
-    "kn": "kan_Knda",
-    "ja": "jpn_Jpan",
-}
-
-
-def translate(text: str, source_lang: str, target_lang: str) -> str:
-    if source_lang == target_lang:
+async def translate(text: str, source_lang: str, target_lang: str) -> str:
+    """Translates text using Gemini API asynchronously."""
+    if not text or source_lang == target_lang:
         return text
 
-    src = LANG_MAP.get(source_lang, "eng_Latn")
-    tgt = LANG_MAP.get(target_lang, "eng_Latn")
+    if not api_key:
+        logger.warning("GEMINI_API_KEY not found. Skipping translation.")
+        return text
 
-    tokenizer.src_lang = src
+    prompt = (
+        f"You are a professional translation engine.\n"
+        f"Translate the following text from {source_lang} to {target_lang}.\n"
+        f"Output ONLY the translated text. No explanations, no extra words.\n\n"
+        f"Text to translate:\n{text}"
+    )
 
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        padding=True,
-        truncation=True,
-        max_length=512,
-    ).to(device)
-
-    with torch.no_grad():
-        output = model.generate(
-            **inputs,
-            forced_bos_token_id=tokenizer.convert_tokens_to_ids(tgt),
-            max_new_tokens=128,
+    try:
+        # Note: google-genai client's generate_content is synchronous in some versions, 
+        # but we should ideally use async if supported or run in thread.
+        # Assuming we want to keep it simple and use the synchronous call for now 
+        # but wrapped in an async def for the pipeline.
+        
+        response = client.models.generate_content(
+            model='gemma-3-4b-it',
+            contents=prompt,
         )
-
-    translated = tokenizer.decode(output[0], skip_special_tokens=True)
-    return translated.strip()
+        
+        if not response or not response.text:
+            logger.warning("Empty response from Gemini API.")
+            return text
+            
+        return response.text.strip()
+    except Exception as e:
+        logger.error(f"Translation error: {e}")
+        return text  # Fallback to original text

@@ -43,34 +43,73 @@ export default function Rooms() {
   }, []);
 
   useEffect(() => {
+    if (!state.isAuthenticated()) {
+      navigate("/login");
+      return;
+    }
     fetchRooms();
   }, []);
 
   async function fetchRooms() {
-    const res = await fetch("http://127.0.0.1:8000/rooms", {
-      headers: {
-        Authorization: `Bearer ${state.token}`,
-      },
-    });
+    try {
+      const res = await fetch("http://127.0.0.1:8000/rooms", {
+        headers: {
+          Authorization: `Bearer ${state.token}`,
+        },
+      });
 
-    const data = await res.json();
-    setRooms(data);
+      if (res.status === 401) {
+        state.token = null;
+        navigate("/login");
+        return;
+      }
+
+      if (!res.ok) {
+        console.error("Failed to fetch rooms:", res.status);
+        setRooms([]);
+        return;
+      }
+
+      const data = await res.json();
+      setRooms(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setRooms([]);
+    }
   }
 
   async function createRoom() {
     if (!roomName.trim()) return;
 
-    const res = await fetch("http://127.0.0.1:8000/rooms", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${state.token}`,
-      },
-      body: JSON.stringify({ name: roomName }),
-    });
+    try {
+      const res = await fetch("http://127.0.0.1:8000/rooms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${state.token}`,
+        },
+        body: JSON.stringify({ name: roomName }),
+      });
 
-    const room = await res.json();
-    navigate(`/chat/${room.id}`);
+      if (!res.ok) {
+        if (res.status === 401) {
+          state.token = null;
+          navigate("/login");
+          return;
+        }
+        const err = await res.json();
+        alert(err.detail || "Failed to create room");
+        return;
+      }
+
+      const room = await res.json();
+      if (room && room.id) {
+        navigate(`/chat/${room.id}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error while creating room");
+    }
   }
 
   function joinByRoomId() {

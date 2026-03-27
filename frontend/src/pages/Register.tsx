@@ -15,25 +15,30 @@ export default function Register() {
     setError("");
     setLoading(true);
 
-    const res = await fetch(API + "/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const res = await fetch(API + "/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json().catch(() => ({}));
+      setLoading(false);
 
-    if (!res.ok) {
-      setError(
-        res.status === 409
-          ? "User already exists. Please login."
-          : data.detail || "Registration failed"
-      );
-      return;
+      if (!res.ok) {
+        setError(
+          res.status === 409
+            ? "User already exists. Please login."
+            : data.detail || "Registration failed"
+        );
+        return;
+      }
+
+      navigate("/login");
+    } catch (err) {
+      setLoading(false);
+      setError("Network or server error. Please try again.");
     }
-
-    navigate("/login");
   }
 
   return (
