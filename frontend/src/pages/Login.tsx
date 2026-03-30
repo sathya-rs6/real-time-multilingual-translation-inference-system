@@ -7,6 +7,8 @@ import video from "../assets/test.mp4";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [userApiKey, setUserApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -32,6 +34,8 @@ export default function Login() {
       const data = await res.json();
       state.token = data.access_token;
       state.userId = email;
+      // Save optional user API key (empty string clears it)
+      state.userApiKey = userApiKey.trim();
 
       navigate("/home");
     } catch (err) {
@@ -97,6 +101,38 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+
+            {/* Optional API Key Section */}
+            <div style={styles.apiKeySection}>
+              <button
+                type="button"
+                style={styles.apiKeyToggle}
+                onClick={() => setShowApiKey((v) => !v)}
+              >
+                <span style={styles.apiKeyToggleIcon}>{showApiKey ? "▾" : "▸"}</span>
+                <span>Use my own Gemini API key</span>
+                <span style={styles.optionalBadge}>Optional</span>
+              </button>
+
+              {showApiKey && (
+                <div style={styles.apiKeyBox}>
+                  <p style={styles.apiKeyHint}>
+                    🔑 Paste your Gemini API key below. If omitted or if your quota is exceeded,
+                    the system will automatically fall back to the default key.
+                  </p>
+                  <input
+                    id="user-api-key"
+                    style={{ ...styles.input, marginBottom: 0, fontFamily: "monospace", fontSize: 12 }}
+                    type="password"
+                    placeholder="AIza…"
+                    value={userApiKey}
+                    onChange={(e) => setUserApiKey(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+              )}
+            </div>
 
             <button
               style={{
@@ -173,7 +209,6 @@ const styles: Record<string, any> = {
     left: 0,
     right: 0,
     padding: 24,
-
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
@@ -222,6 +257,7 @@ const styles: Record<string, any> = {
     borderRadius: 8,
     border: "1px solid #d1d5db",
     fontSize: 14,
+    boxSizing: "border-box",
   },
 
   button: {
@@ -251,5 +287,59 @@ const styles: Record<string, any> = {
     color: "#2563eb",
     cursor: "pointer",
     fontWeight: 500,
+  },
+
+  /* ===== API KEY SECTION ===== */
+  apiKeySection: {
+    marginBottom: 12,
+  },
+
+  apiKeyToggle: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    background: "none",
+    border: "1px dashed #d1d5db",
+    borderRadius: 8,
+    padding: "8px 12px",
+    cursor: "pointer",
+    fontSize: 13,
+    color: "#374151",
+    width: "100%",
+    textAlign: "left",
+    transition: "border-color 0.2s, background 0.2s",
+  },
+
+  apiKeyToggleIcon: {
+    fontSize: 10,
+    color: "#6b7280",
+  },
+
+  optionalBadge: {
+    marginLeft: "auto",
+    fontSize: 10,
+    background: "#eff6ff",
+    color: "#2563eb",
+    border: "1px solid #bfdbfe",
+    borderRadius: 20,
+    padding: "2px 8px",
+    fontWeight: 600,
+    letterSpacing: "0.03em",
+  },
+
+  apiKeyBox: {
+    marginTop: 8,
+    padding: "12px 14px",
+    background: "rgba(239,246,255,0.7)",
+    borderRadius: 8,
+    border: "1px solid #bfdbfe",
+  },
+
+  apiKeyHint: {
+    fontSize: 12,
+    color: "#4b5563",
+    marginBottom: 10,
+    lineHeight: 1.5,
+    margin: "0 0 10px 0",
   },
 };

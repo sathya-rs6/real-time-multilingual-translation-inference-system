@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { state } from "../state";
 import { connectWS } from "../ws";
+import { languages } from "../utils/languages";
 
 type Message = {
   senderId: string;
@@ -39,8 +40,15 @@ function getRandomColor(seed: string | undefined | null) {
   useEffect(() => {
     if (!roomId) return;
 
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${state.token}`,
+    };
+    if (state.userApiKey) {
+      headers["X-User-Api-Key"] = state.userApiKey;
+    }
+
     fetch(`http://127.0.0.1:8000/messages/${roomId}?lang=${targetLanguage}`, {
-      headers: { Authorization: `Bearer ${state.token}` },
+      headers,
     })
       .then((res) => res.json())
       .then((data) => {
@@ -64,7 +72,12 @@ function getRandomColor(seed: string | undefined | null) {
     wsRef.current?.close();
 
     wsRef.current = connectWS(roomId, targetLanguage, (data: any) => {
-      if (data.type !== "message") return;
+      console.log("📩 Chat.tsx received message:", data);
+      
+      if (data.type !== "message") {
+        console.warn("⚠️ Unexpected message type:", data.type);
+        return;
+      }
 
       setMessages((prev) => {
         const newMsg = {
@@ -72,6 +85,8 @@ function getRandomColor(seed: string | undefined | null) {
           senderName: data.sender_name ?? data.sender_id,
           content: data.text,
         };
+        console.log("✅ Adding message to state:", newMsg);
+        
         if (newMsg.senderId !== state.userId) {
           setUserColors((prevColors) => {
             if (!prevColors[newMsg.senderId]) {
@@ -101,6 +116,7 @@ function getRandomColor(seed: string | undefined | null) {
   /* 4️⃣ Send message */
   function send() {
     if (!text.trim()) return;
+    console.log("📤 Sending message:", text);
     wsRef.current?.send(text);
     setText("");
   }
@@ -119,12 +135,11 @@ function getRandomColor(seed: string | undefined | null) {
           onChange={(e) => setTargetLanguage(e.target.value)}
           style={styles.languageSelect}
         >
-          <option value="en">English</option>
-          <option value="hi">Hindi</option>
-          <option value="ml">Malayalam</option>
-          <option value="ta">Tamil</option>
-          <option value="te">Telugu</option>
-          <option value="ja">Japanese</option>
+          {languages.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.name}
+            </option>
+          ))}
         </select>
       </div>
 

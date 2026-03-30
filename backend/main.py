@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 from models.user import User
 from models.message import Message
@@ -10,6 +11,10 @@ from services.language_service import detect_language
 from services.translation_service import translate_if_needed
 
 from api import auth, users, rooms, messages
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 
@@ -45,6 +50,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
 
     user_id = payload["sub"]
     client_lang = websocket.query_params.get("lang", "en")
+    user_api_key = websocket.query_params.get("user_api_key", None) or None
 
     db = SessionLocal()
 
@@ -57,8 +63,10 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
 
         while True:
             text = await websocket.receive_text()
+            logger.info(f"📨 Received message from {user_id}: {text}")
 
             source_lang = detect_language(text)
+            logger.info(f"🌍 Detected language: {source_lang}")
 
             # ✅ persist message FIRST (critical)
             msg = Message(
@@ -70,8 +78,14 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             db.add(msg)
             db.commit()
             db.refresh(msg)   # ✅ ensures msg.id exists
+            logger.info(f"💾 Message saved to DB with ID: {msg.id}")
 
             # ✅ broadcast with message_id
+            # Create async wrapper for translate_if_needed
+            async def translate_wrapper(**kw):
+                return await translate_if_needed(db=db, user_api_key=user_api_key, **kw)
+            
+            logger.info(f"🔊 Starting broadcast to room {room_id}")
             await manager.broadcast(
                 room_id=room_id,
                 sender_id=user_id,
@@ -79,11 +93,9 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
                 original_text=text,
                 source_lang=source_lang,
                 message_id=msg.id,
-                translate_fn=lambda **kw: translate_if_needed(
-                    db=db,
-                    **kw
-                ),
+                translate_fn=translate_wrapper,
             )
+            logger.info(f"✅ Broadcast complete for message {msg.id}")
 
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)

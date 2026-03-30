@@ -23,6 +23,34 @@ export const state = {
     }
   },
 
+  get sendLanguage() {
+    return localStorage.getItem("sendLanguage") || "en";
+  },
+
+  set sendLanguage(value: string) {
+    localStorage.setItem("sendLanguage", value);
+  },
+
+  get receiveLanguage() {
+    return localStorage.getItem("receiveLanguage") || "en";
+  },
+
+  set receiveLanguage(value: string) {
+    localStorage.setItem("receiveLanguage", value);
+  },
+
+  get userApiKey() {
+    return localStorage.getItem("userApiKey") || "";
+  },
+
+  set userApiKey(value: string) {
+    if (value) {
+      localStorage.setItem("userApiKey", value);
+    } else {
+      localStorage.removeItem("userApiKey");
+    }
+  },
+
   isAuthenticated() {
     return !!localStorage.getItem("token");
   },

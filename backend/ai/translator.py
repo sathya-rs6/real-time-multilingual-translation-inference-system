@@ -1,4 +1,6 @@
 import os
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from google import genai
 
@@ -11,17 +13,38 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize the Gemini API client using GEMINI_API_KEY from .env
-api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key)
+# Default system API key from .env
+DEFAULT_API_KEY = os.getenv("GEMINI_API_KEY")
+_default_client = genai.Client(api_key=DEFAULT_API_KEY) if DEFAULT_API_KEY else None
 
-async def translate(text: str, source_lang: str, target_lang: str) -> str:
-    """Translates text using Gemini API asynchronously."""
+# Thread pool for blocking API calls (prevents blocking event loop)
+executor = ThreadPoolExecutor(max_workers=5)
+
+
+def _get_client(user_api_key: str | None = None):
+    """Return a Gemini client. Prefers the user key; falls back to the default system key."""
+    key = (user_api_key or "").strip()
+    if key:
+        return genai.Client(api_key=key), "user"
+    if _default_client:
+        return _default_client, "default"
+    return None, None
+
+
+def _translate_sync(
+    text: str,
+    source_lang: str,
+    target_lang: str,
+    user_api_key: str | None = None,
+) -> str:
+    """Synchronous translation call to Gemini API (runs in thread pool).
+
+    Strategy:
+        1. Try user-provided key (if any).
+        2. On any error (quota, invalid key, etc.), fall back to the default system key.
+        3. If the default key also fails, return the original text.
+    """
     if not text or source_lang == target_lang:
-        return text
-
-    if not api_key:
-        logger.warning("GEMINI_API_KEY not found. Skipping translation.")
         return text
 
     prompt = (
@@ -31,22 +54,66 @@ async def translate(text: str, source_lang: str, target_lang: str) -> str:
         f"Text to translate:\n{text}"
     )
 
+    # Build list of (client, label) to try in order
+    clients_to_try: list[tuple] = []
+
+    user_key = (user_api_key or "").strip()
+    if user_key:
+        clients_to_try.append((genai.Client(api_key=user_key), "user"))
+
+    if _default_client:
+        clients_to_try.append((_default_client, "default"))
+
+    if not clients_to_try:
+        logger.warning("No Gemini API key available. Returning original text.")
+        return text
+
+    for client, label in clients_to_try:
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+            if not response or not response.text:
+                logger.warning(f"Empty response from Gemini API ({label} key).")
+                continue
+
+            logger.info(f"Translation successful via {label} key: {source_lang} → {target_lang}")
+            return response.text.strip()
+
+        except Exception as e:
+            err_str = str(e)
+            # Detect quota / rate-limit errors to log helpfully
+            if "429" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
+                logger.warning(f"Quota/rate-limit hit on {label} key. Trying next key…")
+            else:
+                logger.error(f"Translation error ({label} key): {e}")
+
+    # All keys exhausted
+    logger.error("All Gemini API keys failed. Returning original text.")
+    return text
+
+
+async def translate(
+    text: str,
+    source_lang: str,
+    target_lang: str,
+    user_api_key: str | None = None,
+) -> str:
+    """
+    Asynchronous translation wrapper.
+    Runs the blocking Gemini API call in a thread pool to avoid blocking the event loop.
+    Accepts an optional user_api_key; falls back to the default system key on failure.
+    """
+    if not text or source_lang == target_lang:
+        return text
+
+    loop = asyncio.get_event_loop()
     try:
-        # Note: google-genai client's generate_content is synchronous in some versions, 
-        # but we should ideally use async if supported or run in thread.
-        # Assuming we want to keep it simple and use the synchronous call for now 
-        # but wrapped in an async def for the pipeline.
-        
-        response = client.models.generate_content(
-            model='gemma-3-4b-it',
-            contents=prompt,
+        return await loop.run_in_executor(
+            executor,
+            lambda: _translate_sync(text, source_lang, target_lang, user_api_key),
         )
-        
-        if not response or not response.text:
-            logger.warning("Empty response from Gemini API.")
-            return text
-            
-        return response.text.strip()
     except Exception as e:
-        logger.error(f"Translation error: {e}")
+        logger.error(f"Async translation error: {e}")
         return text  # Fallback to original text
